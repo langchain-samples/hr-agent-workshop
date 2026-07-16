@@ -25,7 +25,7 @@ cp .env.example .env
 | `OPENAI_API_KEY` | Modules 1-4 (default model) | <https://platform.openai.com> |
 | `LANGSMITH_API_KEY` | Modules 3 & 4 (recommended for all) | <https://smith.langchain.com> |
 | `LANGSMITH_API_KEY_GATEWAY` / `WORKSPACE_ID` | Module 3 §1 (LangSmith Gateway policies) | same key as `LANGSMITH_API_KEY`; workspace ID from LangSmith Settings → Workspace |
-| `TAVILY_API_KEY` | Modules 2 & 3 (web search tool) | <https://tavily.com> |
+| `TAVILY_API_KEY` | Modules 1 & 3 (web search tool) | <https://tavily.com> |
 
 ```bash
 # 3. Start Jupyter
@@ -82,7 +82,7 @@ modular-workshops/
 ├── langgraph.json                  (registers agents/deep_agent for langgraph dev)
 ├── utils/
 ├── agents/
-│   ├── research_agent.py           (shared agent factory — Module 2 references, Module 4 imports for eval)
+│   ├── research_agent.py           (shared agent factory — Module 1 references, Module 4 imports for eval)
 │   └── deep_agent/                 (deployable + governed agent for Module 3)
 │       ├── agent.py
 │       ├── AGENTS.md
@@ -91,8 +91,8 @@ modular-workshops/
 │           └── twitter-post/SKILL.md
 ├── images/                         (diagrams used by the notebooks)
 └── modules/
-    ├── 01_langgraph.ipynb          (Module 1)
-    ├── 02_deep_agents.ipynb        (Module 2)
+    ├── 01_deep_agents.ipynb        (Module 1)
+    ├── 02_langgraph.ipynb          (Module 2)
     ├── 03_deploy_and_govern.ipynb  (Module 3)
     └── 04_langsmith.ipynb          (Module 4)
 ```
