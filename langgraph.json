@@ -3,5 +3,6 @@
   "graphs": {
     "deep_agent": "./agents/deep_agent/agent.py:agent"
   },
-  "env": ".env"
+  "env": ".env",
+  "image_distro": "wolfi"
 }

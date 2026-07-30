@@ -14,6 +14,7 @@ directly. `create_run_rule` returns a deep link to the rule's page in the UI.
 
 from __future__ import annotations
 
+import os
 from typing import Optional, Sequence, Union
 from uuid import UUID
 
@@ -67,6 +68,21 @@ def _llm_judge_evaluator(
     else:
         messages = list(prompt)
 
+    # The judge runs on LangSmith's infrastructure, not in this process, so it never
+    # sees your .env. Its credentials come from a secret stored in LangSmith →
+    # Workspace settings → Secrets, referenced here by name only.
+    #
+    # Which secret depends on how .env is set up: LC_GATEWAY_KEY present means this
+    # machine talks to models through the LangSmith Gateway, so point the judge there
+    # too. Otherwise call OpenAI directly. We only check whether the variable is set —
+    # its value stays local and is never sent.
+    model_kwargs = {"model": model_name, "temperature": temperature}
+    if os.environ.get("LC_GATEWAY_KEY"):
+        model_kwargs["base_url"] = "https://gateway.smith.langchain.com/openai"
+        model_kwargs["api_key"] = {"lc": 1, "type": "secret", "id": ["LC_GATEWAY_KEY"]}
+    else:
+        model_kwargs["api_key"] = {"lc": 1, "type": "secret", "id": ["OPENAI_API_KEY"]}
+
     return {
         "structured": {
             "prompt": [list(m) for m in messages],
@@ -74,13 +90,7 @@ def _llm_judge_evaluator(
                 "lc": 1,
                 "type": "constructor",
                 "id": ["langchain", "chat_models", "openai", "ChatOpenAI"],
-                "kwargs": {
-                    "model": model_name,
-                    "temperature": temperature,
-                    # References the workspace-stored OPENAI_API_KEY secret —
-                    # set one in LangSmith → Workspace settings → Secrets.
-                    "api_key": {"lc": 1, "type": "secret", "id": ["OPENAI_API_KEY"]},
-                },
+                "kwargs": model_kwargs,
             },
             "variable_mapping": {input_var: input_var, output_var: output_var},
             "schema": output_schema,

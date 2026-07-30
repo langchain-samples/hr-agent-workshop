@@ -58,7 +58,9 @@ def agent(config: RunnableConfig | None = None):
     web_search = easy_search if cfg.get("search_tool") == "easy" else tavily_search
     context_repo = cfg.get("context_repo")
 
-    routes = {"/memories/": StoreBackend()}
+    # `namespace` is required as of deepagents 0.7.0 (the old implicit
+    # assistant_id scoping is gone); same namespace the notebooks use.
+    routes = {"/memories/": StoreBackend(namespace=lambda rt: ("memories", "shared"))}
     if context_repo:
         routes["/context/"] = ContextHubBackend(context_repo)
 
