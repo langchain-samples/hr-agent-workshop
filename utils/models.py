@@ -3,9 +3,10 @@
 The notebooks all import `model` from here, so swapping providers
 (OpenAI / Anthropic / Azure / Bedrock) only requires editing this file.
 
-The default is OpenAI, direct. Module 3 §1.4 walks through introducing the
-LangSmith LLM Gateway as the production-ready alternative — to make the
-switch, comment out the default below and uncomment the gateway block.
+The default is OpenAI, direct, on the Responses API. Module 3 §1.4 walks
+through introducing the LangSmith LLM Gateway as the production-ready
+alternative — to make the switch, comment out the default below and uncomment
+the gateway block.
 """
 
 import os
@@ -15,24 +16,25 @@ load_dotenv(dotenv_path="../.env", override=True)
 from langchain.chat_models import init_chat_model
 
 # --- Default: OpenAI, direct ---
-model = init_chat_model("openai:gpt-4.1-mini")
+model = init_chat_model("openai:gpt-5.6-terra", use_responses_api=True)
 
 # --- OpenAI via the LangSmith LLM Gateway (Module 3 §1.4) ---
 # Routes every model call through the LangSmith Gateway so that workspace
 # policies (PII / secrets / allow-lists / cost caps) are enforced.
 # model = init_chat_model(
-#     model="gpt-4.1-mini",
+#     model="gpt-5.6-terra",
 #     model_provider="openai",
 #     base_url="https://gateway.smith.langchain.com/openai",
+#     use_responses_api=True,
 #     api_key=os.environ["LANGSMITH_API_KEY_GATEWAY"],
 # )
 
 # --- Anthropic ---
-# model = init_chat_model("anthropic:claude-sonnet-4-5")
+# model = init_chat_model("anthropic:claude-sonnet-5")
 
 # --- Azure OpenAI ---
 # from langchain_openai import AzureChatOpenAI
-# model = AzureChatOpenAI(azure_deployment="gpt-4.1-mini", streaming=True)
+# model = AzureChatOpenAI(azure_deployment="gpt-5.6-terra", streaming=True)
 
 # --- AWS Bedrock ---
 # from langchain_aws import ChatBedrockConverse

@@ -45,7 +45,7 @@ def _llm_judge_evaluator(
     prompt: Union[str, Sequence[tuple[str, str]]],
     output_schema: dict,
     *,
-    model_name: str = "gpt-4o-mini",
+    model_name: str = "gpt-5.6-luna",
     temperature: float = 0,
     input_var: str = "input",
     output_var: str = "output",
@@ -98,7 +98,7 @@ def create_run_rule(
     # If set: attach an LLM-as-judge online evaluator.
     llm_judge_prompt: Optional[Union[str, Sequence[tuple[str, str]]]] = None,
     llm_judge_schema: Optional[dict] = None,
-    llm_judge_model: str = "gpt-4o-mini",
+    llm_judge_model: str = "gpt-5.6-luna",
     # If set: route matching runs to this annotation queue.
     add_to_annotation_queue_id: Optional[Union[str, UUID]] = None,
 ) -> dict:
