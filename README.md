@@ -42,14 +42,14 @@ All modules import `model` from `utils/models.py`. Change one line there to swap
 # utils/models.py
 
 # OpenAI (default)
-model = init_chat_model("openai:gpt-4.1-mini")
+model = init_chat_model("openai:gpt-5.6-terra", use_responses_api=True)
 
 # Anthropic
 # model = init_chat_model("anthropic:claude-sonnet-4-5")
 
 # Azure OpenAI
 # from langchain_openai import AzureChatOpenAI
-# model = AzureChatOpenAI(azure_deployment="gpt-4.1-mini", streaming=True)
+# model = AzureChatOpenAI(azure_deployment="gpt-5.6-terra", streaming=True)
 
 # AWS Bedrock
 # from langchain_aws import ChatBedrockConverse
