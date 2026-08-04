@@ -15,7 +15,7 @@ load_dotenv(dotenv_path="../.env", override=True)
 from langchain.chat_models import init_chat_model
 
 # --- Default: OpenAI, direct ---
-model = init_chat_model("openai:gpt-4.1-mini")
+model = init_chat_model("openai:gpt-5.4-mini")
 
 # --- OpenAI via the LangSmith LLM Gateway (Module 3 §1.4) ---
 # Routes every model call through the LangSmith Gateway so that workspace
