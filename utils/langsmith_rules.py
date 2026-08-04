@@ -14,6 +14,7 @@ directly. `create_run_rule` returns a deep link to the rule's page in the UI.
 
 from __future__ import annotations
 
+import os
 from typing import Optional, Sequence, Union
 from uuid import UUID
 
@@ -45,7 +46,7 @@ def _llm_judge_evaluator(
     prompt: Union[str, Sequence[tuple[str, str]]],
     output_schema: dict,
     *,
-    model_name: str = "gpt-4o-mini",
+    model_name: str = "gpt-5.6-luna",
     temperature: float = 0,
     input_var: str = "input",
     output_var: str = "output",
@@ -67,6 +68,21 @@ def _llm_judge_evaluator(
     else:
         messages = list(prompt)
 
+    # The judge runs on LangSmith's infrastructure, not in this process, so it never
+    # sees your .env. Its credentials come from a secret stored in LangSmith →
+    # Workspace settings → Secrets, referenced here by name only.
+    #
+    # Which secret depends on how .env is set up: LC_GATEWAY_KEY present means this
+    # machine talks to models through the LangSmith Gateway, so point the judge there
+    # too. Otherwise call OpenAI directly. We only check whether the variable is set —
+    # its value stays local and is never sent.
+    model_kwargs = {"model": model_name, "temperature": temperature}
+    if os.environ.get("LC_GATEWAY_KEY"):
+        model_kwargs["base_url"] = "https://gateway.smith.langchain.com/openai"
+        model_kwargs["api_key"] = {"lc": 1, "type": "secret", "id": ["LC_GATEWAY_KEY"]}
+    else:
+        model_kwargs["api_key"] = {"lc": 1, "type": "secret", "id": ["OPENAI_API_KEY"]}
+
     return {
         "structured": {
             "prompt": [list(m) for m in messages],
@@ -74,13 +90,7 @@ def _llm_judge_evaluator(
                 "lc": 1,
                 "type": "constructor",
                 "id": ["langchain", "chat_models", "openai", "ChatOpenAI"],
-                "kwargs": {
-                    "model": model_name,
-                    "temperature": temperature,
-                    # References the workspace-stored OPENAI_API_KEY secret —
-                    # set one in LangSmith → Workspace settings → Secrets.
-                    "api_key": {"lc": 1, "type": "secret", "id": ["OPENAI_API_KEY"]},
-                },
+                "kwargs": model_kwargs,
             },
             "variable_mapping": {input_var: input_var, output_var: output_var},
             "schema": output_schema,
@@ -98,7 +108,7 @@ def create_run_rule(
     # If set: attach an LLM-as-judge online evaluator.
     llm_judge_prompt: Optional[Union[str, Sequence[tuple[str, str]]]] = None,
     llm_judge_schema: Optional[dict] = None,
-    llm_judge_model: str = "gpt-4o-mini",
+    llm_judge_model: str = "gpt-5.6-luna",
     # If set: route matching runs to this annotation queue.
     add_to_annotation_queue_id: Optional[Union[str, UUID]] = None,
 ) -> dict:

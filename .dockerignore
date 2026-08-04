@@ -1,0 +1,17 @@
+# Keep secrets and local dev artifacts out of the deployed image.
+# `langgraph deploy` reads .env from the local filesystem and uploads the
+# values as deployment secrets, so the image itself never needs the file.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+credentials.json
+.venv/
+.git/
+.DS_Store
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+__pycache__/
+**/__pycache__/
