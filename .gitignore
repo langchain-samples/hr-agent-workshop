@@ -27,6 +27,7 @@ env/
 *.ipynb_checkpoints
 
 # Tooling caches
+node_modules/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
