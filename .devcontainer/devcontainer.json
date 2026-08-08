@@ -1,0 +1,13 @@
+{
+  "name": "modular-workshops",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-toolsai.jupyter", "ms-python.python"],
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+      }
+    }
+  }
+}
