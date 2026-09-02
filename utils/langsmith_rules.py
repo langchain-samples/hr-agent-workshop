@@ -26,6 +26,25 @@ from langsmith import Client
 # Annotation queues
 # --------------------------------------------------------------------------- #
 
+def ensure_feedback_configs(client: Client, configs: dict) -> None:
+    """Create (or update) workspace feedback configs by key.
+
+    A queue's rubric items only render input widgets for feedback keys that have
+    a feedback CONFIG in the workspace — the config is what tells LangSmith the
+    widget type (categorical / continuous / freeform) and its allowed values.
+    Without this, the rubric item shows up with no input (an empty feedback cell).
+
+    `configs` maps ``feedback_key -> FeedbackConfig`` dict, e.g.
+    ``{"reviewer_correct": {"type": "categorical", "categories": [...]}}``.
+    """
+    existing = {c.feedback_key for c in client.list_feedback_configs()}
+    for feedback_key, feedback_config in configs.items():
+        if feedback_key in existing:
+            client.update_feedback_config(feedback_key, feedback_config=feedback_config)
+        else:
+            client.create_feedback_config(feedback_key, feedback_config=feedback_config)
+
+
 def get_or_create_annotation_queue(
     client: Client,
     name: str,
@@ -33,15 +52,25 @@ def get_or_create_annotation_queue(
     *,
     rubric_instructions: Optional[str] = None,
     rubric_items: Optional[list] = None,
+    feedback_configs: Optional[dict] = None,
 ):
     """Return an existing annotation queue by name, or create one.
 
     `rubric_instructions` is the guidance shown to the human reviewer, and
     `rubric_items` are the feedback options they fill in (each a dict with at
     least a ``feedback_key``; see LangSmith's ``AnnotationQueueRubricItem``).
+
+    `feedback_configs` maps ``feedback_key -> FeedbackConfig``. These are created
+    first so each rubric item renders a real input widget — otherwise reviewers
+    see an empty feedback cell. When omitted, callers must have already created
+    the configs some other way.
+
     When the queue already exists, the instructions/rubric are updated so
     re-running the notebook keeps them in sync.
     """
+    if feedback_configs:
+        ensure_feedback_configs(client, feedback_configs)
+
     existing = list(client.list_annotation_queues(name=name))
     if existing:
         queue = existing[0]
