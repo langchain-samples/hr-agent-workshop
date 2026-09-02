@@ -55,6 +55,11 @@ jobs:
           # Secrets configured in the repo: Settings -> Secrets and variables -> Actions
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          # Route every model call (the agent AND the LLM-as-judge) through the
+          # LangSmith Gateway so workspace policies apply in CI too. utils/models.py
+          # reads this key; it's the same value as LANGSMITH_API_KEY (see .env.example).
+          # Falls back to LANGSMITH_API_KEY if a dedicated gateway secret isn't set.
+          LANGSMITH_API_KEY_GATEWAY: ${{ secrets.LANGSMITH_API_KEY_GATEWAY || secrets.LANGSMITH_API_KEY }}
           LANGSMITH_TRACING: "true"
           LANGSMITH_PROJECT: "hr-agent-ci"
         run: |
