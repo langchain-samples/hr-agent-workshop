@@ -30,12 +30,34 @@ def get_or_create_annotation_queue(
     client: Client,
     name: str,
     description: str = "",
+    *,
+    rubric_instructions: Optional[str] = None,
+    rubric_items: Optional[list] = None,
 ):
-    """Return an existing annotation queue by name, or create one."""
+    """Return an existing annotation queue by name, or create one.
+
+    `rubric_instructions` is the guidance shown to the human reviewer, and
+    `rubric_items` are the feedback options they fill in (each a dict with at
+    least a ``feedback_key``; see LangSmith's ``AnnotationQueueRubricItem``).
+    When the queue already exists, the instructions/rubric are updated so
+    re-running the notebook keeps them in sync.
+    """
     existing = list(client.list_annotation_queues(name=name))
     if existing:
-        return existing[0]
-    return client.create_annotation_queue(name=name, description=description)
+        queue = existing[0]
+        if rubric_instructions is not None or rubric_items is not None:
+            client.update_annotation_queue(
+                queue.id,
+                rubric_instructions=rubric_instructions,
+                rubric_items=rubric_items,
+            )
+        return queue
+    return client.create_annotation_queue(
+        name=name,
+        description=description,
+        rubric_instructions=rubric_instructions,
+        rubric_items=rubric_items,
+    )
 
 
 # --------------------------------------------------------------------------- #
