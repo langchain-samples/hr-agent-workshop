@@ -53,8 +53,23 @@ jobs:
       - name: Run evals + promotion gate
         env:
           # Secrets configured in the repo: Settings -> Secrets and variables -> Actions
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          # Route EVERY OpenAI call (the agent AND the LLM-as-judge) through the
+          # LangSmith Gateway so workspace policies apply in CI too.
+          #
+          # We set OPENAI_BASE_URL + OPENAI_API_KEY (not just the explicit kwargs in
+          # utils/models.py) because the deep-agent middleware stack can reconstruct
+          # the OpenAI client, and a reconstructed client only inherits base_url/key
+          # from the environment. Setting them here makes the gateway routing stick
+          # no matter which client instance issues the request.
+          #
+          # The gateway authenticates with the LangSmith key (lsv2_...), so
+          # OPENAI_API_KEY is deliberately the LangSmith gateway key, NOT an
+          # OpenAI (sk-...) key. Same value as LANGSMITH_API_KEY (see .env.example);
+          # falls back to it if no dedicated gateway secret is set.
+          OPENAI_BASE_URL: "https://gateway.smith.langchain.com/openai"
+          OPENAI_API_KEY: ${{ secrets.LANGSMITH_API_KEY_GATEWAY || secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_API_KEY_GATEWAY: ${{ secrets.LANGSMITH_API_KEY_GATEWAY || secrets.LANGSMITH_API_KEY }}
           LANGSMITH_TRACING: "true"
           LANGSMITH_PROJECT: "hr-agent-ci"
         run: |
