@@ -1,0 +1,65 @@
+name: HR Agent Evals (promotion gate)
+
+# Runs the HR agent evaluation experiment on every pull request and FAILS the
+# job when any gated score drops below EVAL_THRESHOLD. A failing job blocks the
+# merge, so this workflow acts as a promotion gate for agent changes.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # Only re-run when something that can move the scores changes.
+      - "agents/**"
+      - "evals/**"
+      - "utils/**"
+      - "pyproject.toml"
+      - ".github/workflows/evals.yml"
+  # Allow manual runs with a custom threshold from the Actions tab.
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: "Minimum mean score required to pass"
+        required: false
+        default: "0.8"
+
+# Configurable promotion-gate settings. Change the threshold here (or per-run via
+# workflow_dispatch) — the runner reads these as env vars.
+env:
+  EVAL_TAG: ci
+  EVAL_THRESHOLD: ${{ github.event.inputs.threshold || '0.8' }}
+  # Gate on the deterministic, code-based evaluators. The LLM-judge
+  # (answer_helpfulness) is tagged "offline" (not "ci"), so it doesn't gate CI.
+  EVAL_GATE_KEYS: "figure_correctness,tool_selection,case_opened_correctly"
+  EVAL_MAX_CONCURRENCY: "4"
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run evals + promotion gate
+        env:
+          # Secrets configured in the repo: Settings -> Secrets and variables -> Actions
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_TRACING: "true"
+          LANGSMITH_PROJECT: "hr-agent-ci"
+        run: |
+          uv run python -m evals.run_evals \
+            --tag "$EVAL_TAG" \
+            --threshold "$EVAL_THRESHOLD" \
+            --gate-keys "$EVAL_GATE_KEYS" \
+            --max-concurrency "$EVAL_MAX_CONCURRENCY"

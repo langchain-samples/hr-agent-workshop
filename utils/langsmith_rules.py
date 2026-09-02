@@ -42,11 +42,23 @@ def get_or_create_annotation_queue(
 # Run rules
 # --------------------------------------------------------------------------- #
 
+def _code_evaluator(source: str) -> dict:
+    """Build the `evaluators[]` payload for an online CODE evaluator.
+
+    Code evaluators run on LangSmith's infrastructure with NO model credentials
+    and NO network access — ideal when the workspace has no OpenAI/Anthropic
+    secret. `source` is inline Python defining a single function that takes one
+    `run` dict argument and returns a feedback dict, e.g. `{"correctness": 1}`.
+    Standard library plus numpy/pandas/jsonschema/scipy/scikit-learn are allowed.
+    """
+    return {"structured": {"code": source}}
+
+
 def _llm_judge_evaluator(
     prompt: Union[str, Sequence[tuple[str, str]]],
     output_schema: dict,
     *,
-    model_name: str = "gpt-5.6-luna",
+    model_name: str = "gpt-5.4-nano",
     temperature: float = 0,
     input_var: str = "input",
     output_var: str = "output",
@@ -72,14 +84,20 @@ def _llm_judge_evaluator(
     # sees your .env. Its credentials come from a secret stored in LangSmith →
     # Workspace settings → Secrets, referenced here by name only.
     #
-    # Which secret depends on how .env is set up: LC_GATEWAY_KEY present means this
+    # Which secret depends on how .env is set up: if a gateway key is present this
     # machine talks to models through the LangSmith Gateway, so point the judge there
     # too. Otherwise call OpenAI directly. We only check whether the variable is set —
-    # its value stays local and is never sent.
+    # its value stays local and is never sent. The secret name we reference must
+    # match a secret actually stored in the LangSmith workspace.
+    gateway_secret = next(
+        (name for name in ("LANGSMITH_API_KEY_GATEWAY", "LC_GATEWAY_KEY")
+         if os.environ.get(name)),
+        None,
+    )
     model_kwargs = {"model": model_name, "temperature": temperature}
-    if os.environ.get("LC_GATEWAY_KEY"):
+    if gateway_secret:
         model_kwargs["base_url"] = "https://gateway.smith.langchain.com/openai"
-        model_kwargs["api_key"] = {"lc": 1, "type": "secret", "id": ["LC_GATEWAY_KEY"]}
+        model_kwargs["api_key"] = {"lc": 1, "type": "secret", "id": [gateway_secret]}
     else:
         model_kwargs["api_key"] = {"lc": 1, "type": "secret", "id": ["OPENAI_API_KEY"]}
 
@@ -108,15 +126,21 @@ def create_run_rule(
     # If set: attach an LLM-as-judge online evaluator.
     llm_judge_prompt: Optional[Union[str, Sequence[tuple[str, str]]]] = None,
     llm_judge_schema: Optional[dict] = None,
-    llm_judge_model: str = "gpt-5.6-luna",
+    llm_judge_model: str = "gpt-5.4-nano",
+    # If set: attach an online CODE evaluator (inline Python, no model needed).
+    code_evaluator_source: Optional[str] = None,
     # If set: route matching runs to this annotation queue.
     add_to_annotation_queue_id: Optional[Union[str, UUID]] = None,
 ) -> dict:
     """Create or replace a run rule on a tracing project.
 
     Returns a dict with `id`, `url` (deep link to the rule in the UI), and the
-    raw `payload` LangSmith stored. Either `llm_judge_prompt` (+schema), or
-    `add_to_annotation_queue_id`, or both, should be provided.
+    raw `payload` LangSmith stored. Provide one (or more) of:
+    `llm_judge_prompt` (+schema), `code_evaluator_source`, or
+    `add_to_annotation_queue_id`.
+
+    A CODE evaluator (`code_evaluator_source`) runs on LangSmith's infra with no
+    model credentials — use it when the workspace has no OpenAI/Anthropic secret.
     """
     project = client.read_project(project_name=project_name)
 
@@ -129,6 +153,8 @@ def create_run_rule(
                 llm_judge_prompt, llm_judge_schema, model_name=llm_judge_model,
             )
         )
+    if code_evaluator_source is not None:
+        evaluators.append(_code_evaluator(code_evaluator_source))
 
     body = {
         "display_name": display_name,
@@ -167,7 +193,13 @@ def create_run_rule(
     response = requests.post(
         f"{client.api_url}/runs/rules", json=body, headers=headers, timeout=30,
     )
-    response.raise_for_status()
+    if not response.ok:
+        # Surface the server's validation message — a bare raise_for_status hides
+        # the reason (e.g. which field the API rejected).
+        raise requests.HTTPError(
+            f"{response.status_code} creating run rule: {response.text}",
+            response=response,
+        )
     payload = response.json()
 
     tenant_id = payload["tenant_id"]
