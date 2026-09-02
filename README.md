@@ -11,7 +11,7 @@ This is a condensed version of LangChain Academy, intended to be run in a sessio
 - `modules/01_deep_agents.ipynb` — **Deep Agents**: build the retrieve-then-act HR agent (tools, subagents, memory, middleware, HITL, AGENTS.md + skills).
 - `modules/03_langsmith.ipynb` — **LangSmith**: prompt engineering, tracing, offline/online evaluations, and the CI promotion gate for that agent.
 
-The remaining modules — `modules/02_deploy_and_govern.ipynb` (Deploy + Govern) and `modules/04_engine.ipynb` (Engine) — will be covered in a later session.
+The remaining modules — `modules/02_govern_and_test.ipynb` (Govern + Test) will be covered in a later session.
 
 ## Prerequisites
 
@@ -67,15 +67,14 @@ model = init_chat_model("openai:gpt-5.6-terra", use_responses_api=True)
 # model = ChatBedrockConverse(provider="anthropic", model_id="...")
 ```
 
-`utils/models.py` also ships a commented-out **LangSmith Gateway** block. Module 2 (Deploy + Govern) §1.4 walks through flipping the default to it so every model call (notebooks *and* the deployed agent) is routed through the gateway and subject to workspace policies.
+`utils/models.py` also ships a commented-out **LangSmith Gateway** block. Module 2 (Govern + Test) §1.4 walks through flipping the default to it so every model call (notebooks *and* the testable agent) is routed through the gateway and subject to workspace policies.
 
-## Deploy + Govern (Module 2)
+## Govern + Test (Module 2)
 
-Module 2 (`modules/02_deploy_and_govern.ipynb`) first creates a workspace-level **LangSmith Gateway** policy (PII / secrets redaction), routes the model through the gateway, then deploys the agent at `agents/deep_agent/` to LangSmith via the `langgraph` CLI (installed by `uv sync`). The deploy config is `langgraph.json` at the workshop root.
+Module 2 (`modules/02_govern_and_test.ipynb`) first creates a workspace-level **LangSmith Gateway** policy (PII / secrets redaction), routes the model through the gateway, then tests the agent at `agents/deep_agent/` to LangSmith via the `langgraph` CLI (installed by `uv sync`). The test config is `langgraph.json` at the workshop root.
 
-Because `agents/deep_agent/agent.py` imports `model` from `utils.models`, whichever block is active in `utils/models.py` at deploy time is what ships — flip on the gateway block and the deployed agent inherits it with no extra flags.
+Because `agents/deep_agent/agent.py` imports `model` from `utils.models`, whichever block is active in `utils/models.py` at test time is what ships — flip on the gateway block and the test agent inherits it with no extra flags.
 
-Your `LANGSMITH_API_KEY` must have deployment permissions (use a `lsv2_sk_...` service key). The gateway block reads `LANGSMITH_API_KEY_GATEWAY` (the same key under a non-reserved name, since `langgraph deploy` strips `LANGSMITH_API_KEY` during upload).
 
 ## Evals + CI Promotion Gate (Module 3)
 
@@ -94,12 +93,6 @@ uv run python -m evals.run_evals --tag ci --threshold 0.8 \
 
 CI needs `OPENAI_API_KEY` and `LANGSMITH_API_KEY` as repo secrets (Settings → Secrets and variables → Actions).
 
-## Engine (Module 4)
-
-Module 4 (`modules/04_engine.ipynb`) introduces **LangSmith Engine** — it reads your deployed agent's production traces, clusters recurring failures into issues, diagnoses the root cause against your connected source code, and proposes fixes as GitHub PRs. It runs on the Module 2 deployment, driven through an *assistant* (a saved graph configuration) that swaps in a deliberately broken search tool so Engine has a clear, reproducible issue to find.
-
-Engine's first analysis takes ~20 minutes, so it's best primed before a session. Needs the Module 2 deployment and a `LANGSMITH_API_KEY`.
-
 ## Project Structure
 
 ```
@@ -113,7 +106,7 @@ modular-workshops/
 │   └── hr_seed.py                  (seeds the synthetic HR database, hr.db)
 ├── agents/
 │   ├── hr_agent.py                 (shared HR agent factory — Module 1 inlines the pattern, Module 3 imports it for traces/eval)
-│   └── deep_agent/                 (deployable + governed agent for Module 2)
+│   └── deep_agent/                 (testable + governed agent for Module 2)
 │       ├── agent.py
 │       ├── AGENTS.md
 │       └── skills/
@@ -127,15 +120,11 @@ modular-workshops/
 ├── images/                         (diagrams used by the notebooks)
 └── modules/
     ├── 01_deep_agents.ipynb        (Module 1 — Deep Agents)          [Workshop 1]
-    ├── 02_deploy_and_govern.ipynb  (Module 2 — Deploy + Govern)      [later]
+    ├── 02_govern_and_test.ipynb    (Module 2 — Govern + Test)        [later]
     ├── 03_langsmith.ipynb          (Module 3 — LangSmith + Evals)    [Workshop 1]
-    └── 04_engine.ipynb             (Module 4 — Engine)               [later]
 ```
 
 ## Common Issues
-
-**`langgraph deploy` fails with 403 / permission denied**
-Your API key is a personal token. Generate a service key (`lsv2_sk_...`) in LangSmith settings.
 
 **Notebook can't find `utils` / `agents`**
 Each module's setup cell prepends `project_root` (the workshop root) to `sys.path`. If you moved a notebook, update the `Path().resolve().parent` line to point at the workshop root.
