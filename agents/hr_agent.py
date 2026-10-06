@@ -66,7 +66,7 @@ def lookup_employee(employee_id: int | None = None, name: str | None = None) -> 
     Returns role, department, manager, location, tenure, salary band, and salary.
     Prefer employee_id when you have it — names may be ambiguous (more than one
     employee can share a name). If a name matches multiple people, all matches are
-    returned so you can disambiguate by employee_id.
+    returned so you can disambiguate by employee_id .
 
     Args:
         employee_id: The employee's numeric ID (most reliable).

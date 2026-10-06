@@ -3,6 +3,13 @@ name: HR Agent Evals (promotion gate)
 # Runs the HR agent evaluation experiment on every pull request and FAILS the
 # job when any gated score drops below EVAL_THRESHOLD. A failing job blocks the
 # merge, so this workflow acts as a promotion gate for agent changes.
+#
+# SECURITY (public repo): this uses `pull_request` (NOT `pull_request_target`),
+# so runs triggered by FORK PRs get a read-only token and NO repository secrets
+# by default — a random user cannot exfiltrate LANGSMITH_API_KEY via a PR.
+# The credentialed eval job below is additionally guarded to run only for PRs
+# from THIS repo (not forks). Do not switch to `pull_request_target`, and do not
+# forward secrets to fork PRs.
 
 on:
   pull_request:
@@ -15,12 +22,17 @@ on:
       - "pyproject.toml"
       - ".github/workflows/evals.yml"
   # Allow manual runs with a custom threshold from the Actions tab.
+  # workflow_dispatch requires repo WRITE access, so randoms cannot trigger it.
   workflow_dispatch:
     inputs:
       threshold:
         description: "Minimum mean score required to pass"
         required: false
         default: "0.8"
+
+# Least privilege: the workflow token can only read repo contents.
+permissions:
+  contents: read
 
 # Configurable promotion-gate settings. Change the threshold here (or per-run via
 # workflow_dispatch) — the runner reads these as env vars.
@@ -36,6 +48,13 @@ jobs:
   evals:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Defense in depth: only run the credentialed eval for events that are NOT
+    # fork PRs. For a fork PR, head.repo != this repo, so the job is skipped and
+    # the LangSmith key is never referenced. Same-repo PRs, pushes, and manual
+    # dispatch (all require write access) still run.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v4
 
@@ -53,8 +72,23 @@ jobs:
       - name: Run evals + promotion gate
         env:
           # Secrets configured in the repo: Settings -> Secrets and variables -> Actions
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          # Route EVERY OpenAI call (the agent AND the LLM-as-judge) through the
+          # LangSmith Gateway so workspace policies apply in CI too.
+          #
+          # We set OPENAI_BASE_URL + OPENAI_API_KEY (not just the explicit kwargs in
+          # utils/models.py) because the deep-agent middleware stack can reconstruct
+          # the OpenAI client, and a reconstructed client only inherits base_url/key
+          # from the environment. Setting them here makes the gateway routing stick
+          # no matter which client instance issues the request.
+          #
+          # The gateway authenticates with the LangSmith key (lsv2_...), so
+          # OPENAI_API_KEY is deliberately the LangSmith gateway key, NOT an
+          # OpenAI (sk-...) key. Same value as LANGSMITH_API_KEY (see .env.example);
+          # falls back to it if no dedicated gateway secret is set.
+          OPENAI_BASE_URL: "https://gateway.smith.langchain.com/openai"
+          OPENAI_API_KEY: ${{ secrets.LANGSMITH_API_KEY_GATEWAY || secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_API_KEY_GATEWAY: ${{ secrets.LANGSMITH_API_KEY_GATEWAY || secrets.LANGSMITH_API_KEY }}
           LANGSMITH_TRACING: "true"
           LANGSMITH_PROJECT: "hr-agent-ci"
         run: |
